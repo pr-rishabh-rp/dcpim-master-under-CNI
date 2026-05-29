@@ -7,11 +7,11 @@
 #include <rte_cycles.h>
 
 // TODO: If you use MY_ID in your fork, set it to this host's ID or IP suffix.
-#define MY_ID 22
+// #define MY_ID 22 // Not used anywhere, removing for now
 // TODO: Map host IDs/IP suffixes to DPDK ports if you use outgoing_port().
-#define PORT_0 20
+// #define PORT_0 20 // Not using outgoing_port()
 // TODO: Map host IDs/IP suffixes to DPDK ports if you use outgoing_port().
-#define PORT_1 24
+// #define PORT_1 24 // Not using outgoing_port()
 
 #define RRCC_MTU 1500
 #define TARGET_RATE_bps 5000000000

@@ -29,7 +29,7 @@ def read_arp_and_ip(file = "/proc/net/arp"):
             dict_ip[ip2int(ip)] = eth
 
     # read ip 
-    # TODO: Replace 'eno1d1' with the NIC/VF interface name used for dcPIM traffic.
+    # TODO: Replace 'eno1d1' with the NIC/VF interface name used for dcPIM traffic. // Statically assign IP and MAC to each VF and store those addresses in vf_mapping.csv. Then use something like "python config.py --vf-idx 7 --mapping vf_mapping.csv --total-hosts 32" to run for each VF
     ip = ni.ifaddresses('eno1d1')[ni.AF_INET][0]['addr']
     ether = ni.ifaddresses('eno1d1')[ni.AF_LINK][0]['addr']
     dict_ip[ip2int(ip)] = ether
@@ -65,14 +65,14 @@ def main():
 #include <rte_common.h>
 struct Params params = {{
     .index = {0},
-    // TODO: Set BDP (in packets) for your link bandwidth and RTT.
+    // TODO: Set BDP (in packets) for your link bandwidth and RTT. // Need to get RTT.
     .BDP = 20,
     // TODO: Tune small-flow threshold (in packets) for your workload/BDP.
     .small_flow_thre = 20,
     .mss = 1460,
     .priority_limit = 6,
     // TODO: Set link bandwidth in bps (per host/VF).
-    .bandwidth = 10000000000,
+    .bandwidth = 25000000000,
     .ip = {1},
     .pim_beta = 5,
     .pim_alpha = 1.1,
@@ -81,15 +81,15 @@ struct Params params = {{
     .propagation_delay = 0.0000002,
     // TODO: Set clock bias (seconds) if you need non-zero skew.
     .clock_bias = 0.0000005,
-    // TODO: Set DPDK TX port index for your NIC/VF.
+    // TODO: Set DPDK TX port index for your NIC/VF. Need to connect DPDK with VFs yet.
     .send_port = 0,
     .pim_select_min_iters = 1,
     .batch_tokens = 5,
-    // TODO: Tune offered load if you need a different load level.
+    // TODO: Tune offered load if you need a different load level. // Keeping the same.
     .load = 0.5,
     .token_window = 20,
     .token_window_timeout = 1.1,
-    // TODO: num_hosts derives from small/large IP args; update those in run.sh.
+    // TODO: num_hosts derives from small/large IP args; update those in run.sh. // Dont understand yet. Need to look into it.
     .num_hosts = {2}
 }};
 """.format(int(index) - int(small_ip), ip_str, int(large_ip) - int(small_ip) + 1)

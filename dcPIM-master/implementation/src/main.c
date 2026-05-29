@@ -593,12 +593,12 @@ main(int argc, char **argv)
 	// }
 	// qconf->n_rx_port++;
 
-	// TODO: Update RX port IDs to match the DPDK ports you want this host to receive on.
+	// TODO: Update RX port IDs to match the DPDK ports you want this host to receive on. // RX Lcore is the RECEIVE_CORE which runs for every process to receive the control packets as well as the data packets. We restrict the process to only worry about one VF for our case due to the one-process-per-VF scenario. That port is port 0 since we use -a to define the VF the process will use and that VF is given port 0 assignment by DPDK.
 	qconf->rx_port_list[0] = 0;
 	qconf->n_rx_port++;
 	// TODO: Add/remove RX ports based on how many NIC/VF ports you use.
-	qconf->rx_port_list[1] = 1;
-	qconf->n_rx_port++;
+	// qconf->rx_port_list[1] = 1;
+	// qconf->n_rx_port++;
 
 
 	/* create the mbuf pool */
@@ -622,8 +622,8 @@ main(int argc, char **argv)
 		struct rte_eth_conf local_port_conf = port_conf;
 		struct rte_eth_dev_info dev_info;
 		
-		// TODO: Initialize the correct DPDK port(s) for your NIC/VFs.
-		if(portid != 1)
+		// TODO: Initialize the correct DPDK port(s) for your NIC/VFs. // Since the process is only concerned with one VF, that is its own, it is concerned only with one port, so by accident if there are any other ports, this LOC tells the program to ignore them.
+		if(portid != 0)
 			continue;
 		/* init port*/
 		printf("Initializing port %u... ", portid);
@@ -696,8 +696,8 @@ main(int argc, char **argv)
 	ret = 0;
 	init_config(&params);
 	printf("window timeout cycle:%"PRIu64"\n", params.token_window_timeout_cycle);
-	// TODO: Use the same DPDK port ID you initialized above.
-	rte_eth_macaddr_get(1, &params.ether_addr);
+	// TODO: Use the same DPDK port ID you initialized above. // We used port 0 instead of 1 (They needed port 1 due to CloudLab configuration)
+	rte_eth_macaddr_get(0, &params.ether_addr);
 	/* initialize flow rates and flow nums */
 	// for(int i = 0; i < NUM_FLOW_TYPES; i++) {
 	// 	flow_remainder[i] = 0;
@@ -718,9 +718,13 @@ main(int argc, char **argv)
 		// rte_eal_remote_launch(launch_start_lcore, NULL, 4);
 
 	}  
-	if(mode == 2){
+	/* if(mode == 2){
 		printf("launch start\n");
 		rte_eal_remote_launch(launch_start_lcore, NULL, 4);
+	} */
+	if (mode == 2) {
+    	printf("launch start\n");
+    	start_main_loop();
 	}
 
 	while(!force_quit){
@@ -738,9 +742,9 @@ main(int argc, char **argv)
 	if(rte_eal_wait_lcore(3) < 0){
 		ret = -1;
 	}
-	if(rte_eal_wait_lcore(4) < 0){
+	/*if(rte_eal_wait_lcore(4) < 0){
 		ret = -1;
-	}
+	} */
 	// print_stats();
 
 

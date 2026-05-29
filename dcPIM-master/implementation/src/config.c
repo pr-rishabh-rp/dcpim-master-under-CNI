@@ -44,7 +44,7 @@ double get_rtt(double propagation_delay, int layer, double bytes) {
 // }
 uint32_t get_port_by_ip(uint32_t ip) {
 	// TODO: Map dst IP (or host ID) to the correct DPDK port for your NIC/VFs.
-	return 1;
+	return 0;
 	if(params.ip == 20) {
 		if(ip == 22) {
 			return 1;
