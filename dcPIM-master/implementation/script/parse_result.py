@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 import os
+import csv
 from matplotlib import cm
 import sys
 import json
@@ -127,11 +128,37 @@ def read_tcp_file(filename):
             # if reach_check_point < 10:
             output.append([flowId, size, fct, orct, fct / orct])
     return output
-def read_files(num_nodes, trace):
+
+def read_ids_from_mapping(mapping_path):
+    ids = []
+    with open(mapping_path) as f:
+        reader = csv.reader(f)
+        for row in reader:
+            if not row:
+                continue
+            if row[0].strip().lower() == "id":
+                continue
+            if row[0].strip().startswith("#"):
+                continue
+            ids.append(int(row[0].strip()))
+    return ids
+
+def read_files(num_nodes, trace, mapping_path=None, ids=None):
     pim_output = []
     stats = {}
-    for i in range(num_nodes):
-        pim_file = "../result/{}/result_{}_{}.txt".format(num_nodes, trace, i)
+    if ids is None:
+        if mapping_path:
+            ids = read_ids_from_mapping(mapping_path)
+            num_nodes = len(ids)
+        else:
+            ids = list(range(num_nodes))
+    result_dir = "../result/{}".format(num_nodes)
+    if mapping_path and (not os.path.isdir(result_dir)):
+        alt_dir = "../result/{}".format(num_nodes + 1)
+        if os.path.isdir(alt_dir):
+            result_dir = alt_dir
+    for i in ids:
+        pim_file = "{}/result_{}_{}.txt".format(result_dir, trace, i)
         output = read_pim_file(pim_file)
 
         # sorted_pim_file = sorted(output, key = lambda tup: tup[7])
@@ -229,9 +256,27 @@ def write_cdf_slowdown(pim_output, cdf_pim_mean_file, cdf_pim_99_file):
     #     j += 50
 
 def main():
-    num_nodes = int(sys.argv[1])
-    trace = str(sys.argv[2])
-    stats = read_files(num_nodes, trace)
+    if len(sys.argv) < 2:
+        print ("Usage: python parse_result.py <workload> <vf_mapping.csv>")
+        print ("Legacy: python parse_result.py <num_nodes> <workload> [vf_mapping.csv]")
+        return
+    if len(sys.argv) >= 3 and sys.argv[1].isdigit():
+        num_nodes = int(sys.argv[1])
+        trace = str(sys.argv[2])
+        mapping = sys.argv[3] if len(sys.argv) > 3 else None
+    else:
+        trace = str(sys.argv[1])
+        mapping = sys.argv[2] if len(sys.argv) > 2 else None
+        if mapping is None:
+            print ("Usage: python parse_result.py <workload> <vf_mapping.csv>")
+            return
+        ids = read_ids_from_mapping(mapping)
+        num_nodes = len(ids)
+    ids = None
+    if mapping:
+        ids = read_ids_from_mapping(mapping)
+        num_nodes = len(ids)
+    stats = read_files(num_nodes, trace, mapping, ids)
     output_file(stats,  "../result/{0}_{1}_slowdown_size.dat".format(trace, num_nodes), "<FLOW_SIZE> <MEAN_SLOWDOWN> <DIFF_BETWEEN_TAIL_AND_MEAN>\n")
     # tcp_output = read_files(tcp_date, num_nodes, trace)
     # write_cdf_slowdown(pim_output, "parse_cdf_pim_{}.dat".format(trace), "parse_cdf_pim_{}_99.dat".format(trace))
