@@ -1,5 +1,6 @@
 #!/bin/bash
 num_host=$1
+
 # TODO: Replace these CloudLab hostnames with your server hostnames/IPs.
 ssh_array=(
 ms1301
