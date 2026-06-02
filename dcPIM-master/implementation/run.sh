@@ -38,11 +38,11 @@ if [[ -n "$mapping" ]]; then
     echo "Usage: run.sh --mapping <csv> --self-id <id>"
     exit 1
   fi
-  python config.py --mapping "$mapping" --self-id "$self_id"
+  python3 config.py --mapping "$mapping" --self-id "$self_id"
 else
   pip install netifaces
   # TODO: Set the smallest and largest IP suffix for your host/VF range.
-  python config.py 2 $host
+  python3 config.py 2 $host
 fi
 # compile the code
 # TODO: Set RTE_SDK to your DPDK install path.

@@ -11,9 +11,9 @@ root_dir="$(cd "$script_dir/.." && pwd)"
 
 start_host="${START_SSH_HOST:-}"
 start_user="${START_SSH_USER:-ubuntu}"
-start_key="${START_SSH_KEY:-csmacd11}"
+start_key="${START_SSH_KEY:-}"
 start_port="${START_SSH_PORT:-22}"
-start_dir="${START_SSH_DIR:-~/dcPIM/implementation}"
+start_dir="${START_SSH_DIR:-~dcpim-master-under-cni/dcPIM-master/implementation}"
 start_target=""
 ssh_opts="-o StrictHostKeyChecking=no -p $start_port"
 if [[ -n "$start_key" ]]; then
