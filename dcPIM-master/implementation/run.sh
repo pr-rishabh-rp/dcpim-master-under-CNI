@@ -41,12 +41,12 @@ if [[ -n "$mapping" ]]; then
   python3 config.py --mapping "$mapping" --self-id "$self_id"
 else
   pip install netifaces
-  # TODO: Set the smallest and largest IP suffix for your host/VF range.
+  # TODO: Set the smallest and largest IP suffix for our host/VF range.
   python3 config.py 2 $host
 fi
 # compile the code
-# TODO: Set RTE_SDK to your DPDK install path.
-export RTE_SDK=/usr/local/src/dpdk-stable-18.11.10/
+# TODO: Set RTE_SDK to our DPDK install path. // Set to my installation path
+export RTE_SDK=/usr/src/dpdk-18.11
 
 make clean
 make

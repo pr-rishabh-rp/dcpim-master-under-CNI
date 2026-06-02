@@ -46,7 +46,7 @@ def read_arp_and_ip(file = "/proc/net/arp"):
 
     for key in sorted(dict_ip.keys()):
         ether_addrs.append(dict_ip[key])
-    print ether_addrs
+    print (ether_addrs)
     return ip
 
 def read_mapping(path):
@@ -94,7 +94,7 @@ def main():
     if mapping is not None:
         entries = read_mapping(mapping)
         if self_id is None:
-            print "Usage: python config.py --mapping <csv> --self-id <id>"
+            print ("Usage: python config.py --mapping <csv> --self-id <id>")
             sys.exit(1)
         self_id = int(self_id)
         self_entry = None
@@ -103,7 +103,7 @@ def main():
                 self_entry = e
                 break
         if self_entry is None:
-            print "self-id not found in mapping:", self_id
+            print ("self-id not found in mapping:", self_id)
             sys.exit(1)
         ips = [e["ip"] for e in entries]
         macs = [e["mac"] for e in entries]
