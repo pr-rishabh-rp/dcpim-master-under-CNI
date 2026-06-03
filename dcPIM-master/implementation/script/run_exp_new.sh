@@ -59,8 +59,8 @@ for entry in "${senders[@]}"; do
   if [[ ! -x "$bin" ]]; then
     bin="$root_dir/build/pim"
   fi
-  echo "CHECKPOINT: Running senders on VFs"
-  (cd "$root_dir/build" && sudo "$bin" -l "$lcores" -w "$pci" -- send CDF_${workload}.txt > "$result_dir/result_${workload}_${id}.txt") &
+  echo "CHECKPOINT: Running senders on VF$id"
+  (cd "$root_dir/build" && sudo "$bin" -l "$lcores" -w "$pci" --file-prefix "vf$id" -- send CDF_${workload}.txt > "$result_dir/result_${workload}_${id}.txt") &
 done
 
 sleep 20
@@ -68,13 +68,13 @@ sleep 20
 for entry in "${starters[@]}"; do
   IFS="|" read -r id pci lcores <<< "$entry"
   if [[ -n "$start_host" ]]; then
-    echo "Once again, unto the breach $id..."; ssh $ssh_opts "$start_target" "cd $start_dir; if [ -x build/pim-$id ]; then bin=build/pim-$id; else bin=build/pim; fi; sudo ./$bin -l $lcores -w $pci -- start CDF_${workload}.txt > result_${workload}_${id}.txt" &
+    echo "Once again, unto the breach PF$id..."; ssh $ssh_opts "$start_target" "cd $start_dir; if [ -x build/pim-$id ]; then bin=build/pim-$id; else bin=build/pim; fi; sudo ./\$bin -l $lcores -w $pci --file-prefix pf$id -- start CDF_${workload}.txt > result_${workload}_${id}.txt" &
   else
     bin="$root_dir/build/pim-$id"
     if [[ ! -x "$bin" ]]; then
       bin="$root_dir/build/pim"
     fi
-    (cd "$root_dir/build" && sudo "$bin" -l "$lcores" -w "$pci" -- start CDF_${workload}.txt > "$result_dir/result_${workload}_${id}.txt") &
+    (cd "$root_dir/build" && sudo "$bin" -l "$lcores" -w "$pci" --file-prefix "pf$id" -- start CDF_${workload}.txt > "$result_dir/result_${workload}_${id}.txt") &
   fi
 done
 
