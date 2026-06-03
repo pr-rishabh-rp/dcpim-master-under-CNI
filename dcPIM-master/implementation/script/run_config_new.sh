@@ -37,12 +37,12 @@ do
   if [[ "$role" == "start" && -n "$start_host" ]]; then
     echo "CHECKPOINT: Attempting to ssh into 10.32.199.56"; ssh $ssh_opts "$start_target" "cd $start_dir; bash ./run.sh --mapping vf_mapping.csv --self-id $id"
   else
-    (cd "$root_dir" && bash ./run.sh --mapping "$mapping" --self-id "$id")
+    echo "CHECKPOINT: Running run.sh locally for VF$id."; (cd "$root_dir" && bash ./run.sh --mapping vf_mapping.csv --self-id "$id")
     if [[ -f "$root_dir/src/config2.c" ]]; then
       cp "$root_dir/src/config2.c" "$root_dir/src/config2_$id.c"
     fi
     if [[ -f "$root_dir/build/pim" ]]; then
-      cp "$root_dir/build/pim" "$root_dir/build/pim-$id"
+      echo "Copying stuff for VFs into build according to ID:$id."; cp "$root_dir/build/pim" "$root_dir/build/pim-$id"
     fi
   fi
 done < "$mapping"
