@@ -35,7 +35,7 @@ do
   fi
   echo "Building config for id=$id ip=$ip"
   if [[ "$role" == "start" && -n "$start_host" ]]; then
-    echo "CHECKPOINT: Attempting to ssh into 10.32.199.56"; ssh $ssh_opts "$start_target" "cd $start_dir; bash ./run.sh --mapping vf_mapping.csv --self-id $id"
+    echo "CHECKPOINT: Attempting to ssh into 10.32.199.56"; ssh -n $ssh_opts "$start_target" "cd $start_dir; bash ./run.sh --mapping vf_mapping.csv --self-id $id"
   else
     echo "CHECKPOINT: Running run.sh locally for VF$id."; (cd "$root_dir" && bash ./run.sh --mapping vf_mapping.csv --self-id "$id")
     if [[ -f "$root_dir/src/config2.c" ]]; then
