@@ -89,6 +89,7 @@ def get_arg_value(flag):
     return None
 
 def main():
+    print ("CHECKPOINT: We are inside config.py")
     mapping = get_arg_value("--mapping")
     self_id = get_arg_value("--self-id")
     if mapping is not None:
@@ -120,6 +121,7 @@ def main():
         index = int(ip.split(".")[3]) - int(small_ip)
         num_hosts = int(large_ip) - int(small_ip) + 1
     ip_str =  "IPv4(" + ip.replace(".", ",") + ")"
+    print ("CHECKPOINT: Creating config2.c")
     config_string = """
 #include "config.h"
 #include <rte_ip.h>

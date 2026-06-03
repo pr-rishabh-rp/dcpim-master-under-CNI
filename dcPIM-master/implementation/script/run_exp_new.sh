@@ -1,4 +1,5 @@
 #!/bin/bash
+echo "CHECKPOINT: We are inside run_exp_new.sh"
 mapping=$1
 workload=$2
 
@@ -10,6 +11,7 @@ fi
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root_dir="$(cd "$script_dir/.." && pwd)"
 result_dir="$root_dir/../result/$(wc -l < "$mapping")"
+echo "Making result directory..."
 mkdir -p "$result_dir"
 
 start_host="${START_SSH_HOST:-}"
@@ -48,7 +50,7 @@ done < "$mapping"
 
 (cd "$root_dir" && sudo killall pim)
 if [[ -n "$start_host" ]]; then
-  ssh $ssh_opts "$start_target" "cd $start_dir; sudo killall pim"
+  echo "Going inside 10.32.199.56"; ssh $ssh_opts "$start_target" "cd $start_dir; sudo killall pim"
 fi
 
 for entry in "${senders[@]}"; do
@@ -57,7 +59,8 @@ for entry in "${senders[@]}"; do
   if [[ ! -x "$bin" ]]; then
     bin="$root_dir/build/pim"
   fi
-  (cd "$root_dir" && sudo "$bin" -l "$lcores" -a "$pci" -- send CDF_${workload}.txt > "$result_dir/result_${workload}_${id}.txt") &
+  echo "CHECKPOINT: Running senders on VFs"
+  (cd "$root_dir/build" && sudo "$bin" -l "$lcores" -w "$pci" -- send CDF_${workload}.txt > "$result_dir/result_${workload}_${id}.txt") &
 done
 
 sleep 20
@@ -65,13 +68,13 @@ sleep 20
 for entry in "${starters[@]}"; do
   IFS="|" read -r id pci lcores <<< "$entry"
   if [[ -n "$start_host" ]]; then
-    ssh $ssh_opts "$start_target" "cd $start_dir; if [ -x build/pim-$id ]; then bin=build/pim-$id; else bin=build/pim; fi; sudo ./$bin -l $lcores -a $pci -- start CDF_${workload}.txt > result_${workload}_${id}.txt" &
+    echo "Once again, unto the breach $id..."; ssh $ssh_opts "$start_target" "cd $start_dir; if [ -x build/pim-$id ]; then bin=build/pim-$id; else bin=build/pim; fi; sudo ./$bin -l $lcores -w $pci -- start CDF_${workload}.txt > result_${workload}_${id}.txt" &
   else
     bin="$root_dir/build/pim-$id"
     if [[ ! -x "$bin" ]]; then
       bin="$root_dir/build/pim"
     fi
-    (cd "$root_dir" && sudo "$bin" -l "$lcores" -a "$pci" -- start CDF_${workload}.txt > "$result_dir/result_${workload}_${id}.txt") &
+    (cd "$root_dir/build" && sudo "$bin" -l "$lcores" -w "$pci" -- start CDF_${workload}.txt > "$result_dir/result_${workload}_${id}.txt") &
   fi
 done
 

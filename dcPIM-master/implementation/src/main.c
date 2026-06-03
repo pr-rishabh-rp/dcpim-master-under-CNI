@@ -108,7 +108,7 @@ bool start_signal;
 
 #define TARGET_NUM 5000
 
-static unsigned char
+/*static unsigned char
 outgoing_port(unsigned char id) {
 	switch(id) {
 	case PORT_0:
@@ -118,7 +118,7 @@ outgoing_port(unsigned char id) {
 	default:
 		return 255;
 	}
-}
+}*/
 
 static void host_main_loop(void) {
 	struct rte_mbuf *pkts_burst[MAX_PKT_BURST];

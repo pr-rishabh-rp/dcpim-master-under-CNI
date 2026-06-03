@@ -13,7 +13,7 @@ start_host="${START_SSH_HOST:-}"
 start_user="${START_SSH_USER:-ubuntu}"
 start_key="${START_SSH_KEY:-}"
 start_port="${START_SSH_PORT:-22}"
-start_dir="${START_SSH_DIR:-~dcpim-master-under-cni/dcPIM-master/implementation}"
+start_dir="${START_SSH_DIR:-~/dcpim-master-under-cni/dcPIM-master/implementation}"
 start_target=""
 ssh_opts="-o StrictHostKeyChecking=no -p $start_port"
 if [[ -n "$start_key" ]]; then
@@ -35,7 +35,7 @@ do
   fi
   echo "Building config for id=$id ip=$ip"
   if [[ "$role" == "start" && -n "$start_host" ]]; then
-    ssh $ssh_opts "$start_target" "cd $start_dir; bash ./run.sh --mapping vf_mapping.csv --self-id $id"
+    echo "CHECKPOINT: Attempting to ssh into 10.32.199.56"; ssh $ssh_opts "$start_target" "cd $start_dir; bash ./run.sh --mapping vf_mapping.csv --self-id $id"
   else
     (cd "$root_dir" && bash ./run.sh --mapping "$mapping" --self-id "$id")
     if [[ -f "$root_dir/src/config2.c" ]]; then
