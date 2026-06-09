@@ -61,6 +61,7 @@ for entry in "${senders[@]}"; do
   fi
   echo "CHECKPOINT: Running senders on VF$id"
   (cd "$root_dir" && sudo "$bin" -l "$lcores" -w "$pci" --file-prefix "vf$id" -- send CDF_${workload}.txt > "$result_dir/result_${workload}_${id}.txt") &
+  echo "Senders on VF$id should be running now."
 done
 
 sleep 20
@@ -74,7 +75,9 @@ for entry in "${starters[@]}"; do
     if [[ ! -x "$bin" ]]; then
       bin="$root_dir/build/pim"
     fi
+    echo "CHECKPOINT: Running start on PF$id"
     (cd "$root_dir" && sudo "$bin" -l "$lcores" -w "$pci" --file-prefix "pf$id" -- start CDF_${workload}.txt > "$result_dir/result_${workload}_${id}.txt") &
+    echo "Start on PF$id should be running now."
   fi
 done
 

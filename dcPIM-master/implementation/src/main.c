@@ -718,14 +718,14 @@ main(int argc, char **argv)
 		// rte_eal_remote_launch(launch_start_lcore, NULL, 4);
 
 	}  
-	/* if(mode == 2){
+	if(mode == 2){
 		printf("launch start\n");
 		rte_eal_remote_launch(launch_start_lcore, NULL, 4);
-	} */
-	if (mode == 2) {
+	}
+	/* if (mode == 2) {
     	printf("launch start\n");
     	start_main_loop();
-	}
+	} */
 
 	while(!force_quit){
 		// print_stats();
