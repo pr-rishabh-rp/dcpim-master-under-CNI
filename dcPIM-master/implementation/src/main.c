@@ -105,6 +105,7 @@ char *cdf_file;
 static volatile bool force_quit;
 
 bool start_signal;
+unsigned receive_core;
 
 #define TARGET_NUM 5000
 
@@ -567,6 +568,12 @@ main(int argc, char **argv)
 
 	force_quit = false;
 	start_signal = false;
+
+	/* dynamically assign slave lcores from EAL list */
+	receive_core        = rte_get_next_lcore(-1, 1, 0);
+	unsigned pacer_core  = rte_get_next_lcore(receive_core, 1, 0);
+	unsigned flowgen_core = rte_get_next_lcore(pacer_core, 1, 0);
+	unsigned start_core  = rte_get_next_lcore(flowgen_core, 1, 0);
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
@@ -585,7 +592,8 @@ main(int argc, char **argv)
 		rte_exit(EXIT_FAILURE, "No Ethernet ports - bye\n");
 
 	/*initialize lcore 1 as RX for ports 0 and 1*/
-	qconf = &lcore_queue_conf[RECEIVE_CORE];
+	// qconf = &lcore_queue_conf[RECEIVE_CORE];
+	qconf = &lcore_queue_conf[receive_core];
 	// if(params.ip == 22) {
 	// 	qconf->rx_port_list[0] = 0;
 	// } else if (params.ip == 24) {
@@ -712,15 +720,19 @@ main(int argc, char **argv)
 	    pim_init_pacer(&pacer, &host, 0);
 	    pim_init_epoch(&epoch, &host, &pacer);
 	    // TODO: Ensure these lcore IDs match your EAL core list (-l) and RECEIVE_CORE.
-	    rte_eal_remote_launch(launch_host_lcore, NULL, RECEIVE_CORE);
-		rte_eal_remote_launch(launch_pacer_lcore, NULL, 2);
-	    rte_eal_remote_launch(launch_flowgen_lcore, NULL, 3);
+	    // rte_eal_remote_launch(launch_host_lcore, NULL, RECEIVE_CORE);
+		// rte_eal_remote_launch(launch_pacer_lcore, NULL, 2);
+	    // rte_eal_remote_launch(launch_flowgen_lcore, NULL, 3);
 		// rte_eal_remote_launch(launch_start_lcore, NULL, 4);
+	    rte_eal_remote_launch(launch_host_lcore, NULL, receive_core);
+		rte_eal_remote_launch(launch_pacer_lcore, NULL, pacer_core);
+	    rte_eal_remote_launch(launch_flowgen_lcore, NULL, flowgen_core);
 
-	}  
+	}
 	if(mode == 2){
 		printf("launch start\n");
-		rte_eal_remote_launch(launch_start_lcore, NULL, 4);
+		// rte_eal_remote_launch(launch_start_lcore, NULL, 4);
+		rte_eal_remote_launch(launch_start_lcore, NULL, start_core);
 	}
 	/* if (mode == 2) {
     	printf("launch start\n");
@@ -733,13 +745,16 @@ main(int argc, char **argv)
 		rte_delay_us_sleep(1000000);
 	}
 
-	if(rte_eal_wait_lcore(RECEIVE_CORE) < 0){
-	ret = -1;
-	}
-	if(rte_eal_wait_lcore(2) < 0){
+	// if(rte_eal_wait_lcore(RECEIVE_CORE) < 0){ ret = -1; }
+	// if(rte_eal_wait_lcore(2) < 0){ ret = -1; }
+	// if(rte_eal_wait_lcore(3) < 0){ ret = -1; }
+	if(rte_eal_wait_lcore(receive_core) < 0){
 		ret = -1;
 	}
-	if(rte_eal_wait_lcore(3) < 0){
+	if(rte_eal_wait_lcore(pacer_core) < 0){
+		ret = -1;
+	}
+	if(rte_eal_wait_lcore(flowgen_core) < 0){
 		ret = -1;
 	}
 	/*if(rte_eal_wait_lcore(4) < 0){

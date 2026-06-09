@@ -24,7 +24,8 @@
 // TODO: Set to >= max number of hosts/VFs you will run. // Keeping it as it is for now
 #define PIM_NUM_HOST 40
 // TODO: Set to the lcore ID that should run the RX/host loop (must match EAL -l). // Good to know, Ill keep RECEIVE_CORE on 1 durng EAL. Will change if using a different lcore.
-#define RECEIVE_CORE 1
+// #define RECEIVE_CORE 1
+extern unsigned receive_core;
 struct pim_flow;
 extern bool start_signal;
 struct pim_rts {
