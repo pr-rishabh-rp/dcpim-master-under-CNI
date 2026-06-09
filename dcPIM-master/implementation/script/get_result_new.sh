@@ -14,7 +14,7 @@ fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root_dir="$(cd "$script_dir/.." && pwd)"
-result_dir="$root_dir/../result/$(wc -l < "$mapping")"
+result_dir="$root_dir/result/$(wc -l < "$mapping")"
 mkdir -p "$result_dir"
 
 scp_opts="-o StrictHostKeyChecking=no"

@@ -10,9 +10,10 @@ fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root_dir="$(cd "$script_dir/.." && pwd)"
-result_dir="$root_dir/../result/$(wc -l < "$mapping")"
+result_dir="$root_dir/result/$(wc -l < "$mapping")"
 echo "Making result directory..."
 mkdir -p "$result_dir"
+echo "DEBUG result_dir: $result_dir"
 
 start_host="${START_SSH_HOST:-}"
 start_user="${START_SSH_USER:-ubuntu}"
@@ -48,9 +49,12 @@ do
   fi
 done < "$mapping"
 
+echo "DEBUG senders: ${senders[@]}"
+echo "DEBUG starters: ${starters[@]}"
+
 (cd "$root_dir" && sudo killall pim)
 if [[ -n "$start_host" ]]; then
-  echo "Going inside 10.32.199.56"; ssh $ssh_opts "$start_target" "cd $start_dir; sudo killall pim"
+  echo "Going inside 10.32.199.56"; ssh -n $ssh_opts "$start_target" "cd $start_dir; sudo killall pim"
 fi
 
 for entry in "${senders[@]}"; do
@@ -60,7 +64,7 @@ for entry in "${senders[@]}"; do
     bin="$root_dir/build/pim"
   fi
   echo "CHECKPOINT: Running senders on VF$id"
-  (cd "$root_dir" && sudo "$bin" -l "$lcores" -w "$pci" --file-prefix "vf$id" -- send CDF_${workload}.txt > "$result_dir/result_${workload}_${id}.txt") &
+  (cd "$root_dir" && sudo "$bin" -l "$lcores" -w "$pci" --file-prefix "vf$id" -- send CDF_${workload}.txt > "$result_dir/result_${workload}_${id}.txt" 2>&1) &
   echo "Senders on VF$id should be running now."
 done
 
@@ -85,5 +89,6 @@ sleep 120
 
 (cd "$root_dir" && sudo killall pim)
 if [[ -n "$start_host" ]]; then
-  ssh $ssh_opts "$start_target" "cd $start_dir; sudo killall pim"
+  echo "Killing pim process in 10.32.199.56"
+  ssh -n $ssh_opts "$start_target" "cd $start_dir; sudo killall pim"
 fi
