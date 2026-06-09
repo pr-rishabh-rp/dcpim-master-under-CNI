@@ -73,7 +73,7 @@ sleep 20
 for entry in "${starters[@]}"; do
   IFS="|" read -r id pci lcores <<< "$entry"
   if [[ -n "$start_host" ]]; then
-    echo "Once again, unto the breach PF$id..."; ssh $ssh_opts "$start_target" "cd $start_dir; if [ -x build/pim-$id ]; then bin=build/pim-$id; else bin=build/pim; fi; sudo ./\$bin -l $lcores -w $pci --file-prefix pf$id -- start CDF_${workload}.txt > result_${workload}_${id}.txt" &
+    echo "Once again, unto the breach PF$id..."; ssh $ssh_opts "$start_target" "cd $start_dir; if [ -x build/pim-$id ]; then bin=$start_dir/build/pim-$id; else bin=$start_dir/build/pim; fi; sudo \$bin -l $lcores -w $pci --file-prefix pf$id -- start CDF_${workload}.txt > result_${workload}_${id}.txt" &
   else
     bin="$root_dir/build/pim-$id"
     if [[ ! -x "$bin" ]]; then
