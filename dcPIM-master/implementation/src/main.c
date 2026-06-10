@@ -246,7 +246,12 @@ static void pacer_main_loop(void) {
 }
 static void start_main_loop(void) {
 	// unsigned lcore_id;
-	rte_delay_us_block(2000000);
+	// Wait before broadcasting the one-shot PIM_START packet. This delay must be
+	// long enough for (a) the SFP+ carrier to come up from this PF's dev_start, and
+	// (b) all remote senders to finish VF dev_start and reach host_main_loop, since
+	// PIM_START is sent exactly ONCE with no retransmission. Was 2s, too short on NFP.
+	// rte_delay_us_block(2000000);
+	rte_delay_us_block(30000000);
 	int ips[1] = {24};
 	unsigned i = 0;
 	for (; i < params.num_hosts; i++) {

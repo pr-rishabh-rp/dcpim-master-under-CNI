@@ -52,9 +52,9 @@ done < "$mapping"
 echo "DEBUG senders: ${senders[@]}"
 echo "DEBUG starters: ${starters[@]}"
 
-(cd "$root_dir" && sudo killall pim)
+(cd "$root_dir" && sudo killall -r '^pim')
 if [[ -n "$start_host" ]]; then
-  echo "Going inside 10.32.199.56"; ssh -n $ssh_opts "$start_target" "cd $start_dir; sudo killall pim"
+  echo "Going inside 10.32.199.56"; ssh -n $ssh_opts "$start_target" "cd $start_dir; sudo killall -r '^pim'"
 fi
 
 # Senders used to be before but due to the host PF link being down due to the remote PF link being down (control is in the hands of DPDK), nfp_net_reconfig() was failing with 80000000.
@@ -89,8 +89,8 @@ sleep 20
 
 sleep 120
 
-(cd "$root_dir" && sudo killall pim)
+(cd "$root_dir" && sudo killall -r '^pim')
 if [[ -n "$start_host" ]]; then
   echo "Killing pim process in 10.32.199.56"
-  ssh -n $ssh_opts "$start_target" "cd $start_dir; sudo killall pim"
+  ssh -n $ssh_opts "$start_target" "cd $start_dir; sudo killall -r '^pim'"
 fi
