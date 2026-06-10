@@ -85,8 +85,6 @@ for entry in "${senders[@]}"; do
   echo "Senders on VF$id should be running now."
 done
 
-sleep 20
-
 sleep 120
 
 (cd "$root_dir" && sudo killall -r '^pim')

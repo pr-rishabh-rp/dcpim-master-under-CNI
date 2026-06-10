@@ -711,6 +711,14 @@ main(int argc, char **argv)
 	printf("window timeout cycle:%"PRIu64"\n", params.token_window_timeout_cycle);
 	// TODO: Use the same DPDK port ID you initialized above. // We used port 0 instead of 1 (They needed port 1 due to CloudLab configuration)
 	rte_eth_macaddr_get(0, &params.ether_addr);
+	// DEBUG: log the real hardware MAC of port 0 so it can be compared against the
+	// MAC column in vf_mapping.csv. Promiscuous is disabled (rte_eth_promiscuous_disable),
+	// so a sender only receives frames whose dst MAC equals this. If the CSV MAC for this
+	// node differs, PIM_START (and all traffic) is silently dropped by the VF MAC filter.
+	printf("Port 0 actual MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+		params.ether_addr.addr_bytes[0], params.ether_addr.addr_bytes[1],
+		params.ether_addr.addr_bytes[2], params.ether_addr.addr_bytes[3],
+		params.ether_addr.addr_bytes[4], params.ether_addr.addr_bytes[5]);
 	/* initialize flow rates and flow nums */
 	// for(int i = 0; i < NUM_FLOW_TYPES; i++) {
 	// 	flow_remainder[i] = 0;
