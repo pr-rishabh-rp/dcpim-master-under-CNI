@@ -57,18 +57,7 @@ if [[ -n "$start_host" ]]; then
   echo "Going inside 10.32.199.56"; ssh -n $ssh_opts "$start_target" "cd $start_dir; sudo killall pim"
 fi
 
-for entry in "${senders[@]}"; do
-  IFS="|" read -r id pci lcores <<< "$entry"
-  bin="$root_dir/build/pim-$id"
-  if [[ ! -x "$bin" ]]; then
-    bin="$root_dir/build/pim"
-  fi
-  echo "CHECKPOINT: Running senders on VF$id"
-  (cd "$root_dir" && sudo "$bin" -l "$lcores" -w "$pci" --file-prefix "vf$id" -- send CDF_${workload}.txt > "$result_dir/result_${workload}_${id}.txt" 2>&1) &
-  echo "Senders on VF$id should be running now."
-done
-
-sleep 20
+# Senders used to be before but due to the host PF link being down due to the remote PF link being down (control is in the hands of DPDK), nfp_net_reconfig() was failing with 80000000.
 
 for entry in "${starters[@]}"; do
   IFS="|" read -r id pci lcores <<< "$entry"
@@ -84,6 +73,19 @@ for entry in "${starters[@]}"; do
     echo "Start on PF$id should be running now."
   fi
 done
+
+for entry in "${senders[@]}"; do
+  IFS="|" read -r id pci lcores <<< "$entry"
+  bin="$root_dir/build/pim-$id"
+  if [[ ! -x "$bin" ]]; then
+    bin="$root_dir/build/pim"
+  fi
+  echo "CHECKPOINT: Running senders on VF$id"
+  (cd "$root_dir" && sudo "$bin" -l "$lcores" -w "$pci" --file-prefix "vf$id" -- send CDF_${workload}.txt > "$result_dir/result_${workload}_${id}.txt" 2>&1) &
+  echo "Senders on VF$id should be running now."
+done
+
+sleep 20
 
 sleep 120
 
