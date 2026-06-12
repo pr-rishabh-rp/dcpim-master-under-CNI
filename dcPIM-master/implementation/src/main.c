@@ -591,6 +591,17 @@ main(int argc, char **argv)
 	if(argc >= 3) {
 		cdf_file = argv[2];
 	}
+	/* Self-identity from the node id passed as argv[3], e.g. "send CDF.txt 3".
+	 * One binary serves every node: params.ip/index were hardcoded placeholders
+	 * (all nodes thought they were 7.0.0.10). Now each node sets its own identity
+	 * at runtime so it sends its own src IP and correctly skips itself in the peer
+	 * table. The id (2..5) maps to 10.0.0.<id>, matching dst_ips in init_config. */
+	if(argc >= 4) {
+		uint32_t self_id = (uint32_t)atoi(argv[3]);
+		params.ip = IPv4(10, 0, 0, self_id);
+		params.index = self_id;
+		printf("Self identity: id=%u ip=10.0.0.%u\n", self_id, self_id);
+	}
 	/* exit if no ports open*/
 	num_ports = rte_eth_dev_count();
 	if (num_ports == 0)

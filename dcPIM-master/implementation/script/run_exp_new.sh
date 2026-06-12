@@ -62,14 +62,14 @@ fi
 for entry in "${starters[@]}"; do
   IFS="|" read -r id pci lcores <<< "$entry"
   if [[ -n "$start_host" ]]; then
-    echo "Once again, unto the breach PF$id..."; ssh $ssh_opts "$start_target" "cd $start_dir; if [ -x build/pim-$id ]; then bin=$start_dir/build/pim-$id; else bin=$start_dir/build/pim; fi; sudo \$bin -l $lcores -w $pci --file-prefix pf$id -- start CDF_${workload}.txt > result_${workload}_${id}.txt" &
+    echo "Once again, unto the breach PF$id..."; ssh $ssh_opts "$start_target" "cd $start_dir; if [ -x build/pim-$id ]; then bin=$start_dir/build/pim-$id; else bin=$start_dir/build/pim; fi; sudo \$bin -l $lcores -w $pci --file-prefix pf$id -- start CDF_${workload}.txt $id > result_${workload}_${id}.txt" &
   else
     bin="$root_dir/build/pim-$id"
     if [[ ! -x "$bin" ]]; then
       bin="$root_dir/build/pim"
     fi
     echo "CHECKPOINT: Running start on PF$id"
-    (cd "$root_dir" && sudo "$bin" -l "$lcores" -w "$pci" --file-prefix "pf$id" -- start CDF_${workload}.txt > "$result_dir/result_${workload}_${id}.txt") &
+    (cd "$root_dir" && sudo "$bin" -l "$lcores" -w "$pci" --file-prefix "pf$id" -- start CDF_${workload}.txt $id > "$result_dir/result_${workload}_${id}.txt") &
     echo "Start on PF$id should be running now."
   fi
 done
@@ -81,7 +81,7 @@ for entry in "${senders[@]}"; do
     bin="$root_dir/build/pim"
   fi
   echo "CHECKPOINT: Running senders on VF$id"
-  (cd "$root_dir" && sudo "$bin" -l "$lcores" -w "$pci" --file-prefix "vf$id" -- send CDF_${workload}.txt > "$result_dir/result_${workload}_${id}.txt" 2>&1) &
+  (cd "$root_dir" && sudo "$bin" -l "$lcores" -w "$pci" --file-prefix "vf$id" -- send CDF_${workload}.txt $id > "$result_dir/result_${workload}_${id}.txt" 2>&1) &
   echo "Senders on VF$id should be running now."
 done
 
