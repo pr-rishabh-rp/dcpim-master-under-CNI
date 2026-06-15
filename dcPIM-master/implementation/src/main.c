@@ -786,6 +786,19 @@ main(int argc, char **argv)
 	} */
 	// print_stats();
 
+	/* DEBUG: dump per-port HW counters so we can see whether packets actually
+	 * left the wire (opackets) and arrived (ipackets), independent of the PIM
+	 * protocol logic. ierrors/imissed flag drops at the NIC. */
+	RTE_ETH_FOREACH_DEV(portid) {
+		struct rte_eth_stats st;
+		if (rte_eth_stats_get(portid, &st) == 0) {
+			printf("PORT %d STATS: ipackets=%"PRIu64" opackets=%"PRIu64
+			       " ierrors=%"PRIu64" oerrors=%"PRIu64
+			       " imissed=%"PRIu64" rx_nombuf=%"PRIu64"\n",
+			       portid, st.ipackets, st.opackets, st.ierrors,
+			       st.oerrors, st.imissed, st.rx_nombuf);
+		}
+	}
 
 	RTE_ETH_FOREACH_DEV(portid) {
 		printf("Closing port %d...", portid);
