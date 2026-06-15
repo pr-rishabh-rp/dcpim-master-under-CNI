@@ -152,8 +152,13 @@ static void host_main_loop(void) {
 	//  PERIODICAL, 1, &pim_start_new_epoch, (void *)(&epoch.pim_timer_params));
 	while(!force_quit) {
 		for (i = 0; i < qconf->n_rx_port; i++) {
-			if(i == 0)
-				continue;
+			// OLD: skipped index 0. On the CloudLab setup the data port was port 1
+			// and port 0 was skipped. Here the VF's (and the PF's) data port IS
+			// rx_port_list[0] = 0, so skipping index 0 meant rte_eth_rx_burst was
+			// NEVER called -> zero RX (ipackets stuck at ring size, imissed flood,
+			// PIM_START never processed, nothing ever transmitted).
+			// if(i == 0)
+			// 	continue;
 			portid = qconf->rx_port_list[i];
 
 			nb_rx = rte_eth_rx_burst(portid, 0,
