@@ -77,8 +77,11 @@ def read_pim_file(filename):
                 dst = int(params[2])
                 size = float(params[3])
                 fct = float(params[4])
-                # TODO: Replace 10000000000.0 with your link bandwidth (bps).
-                orct = size * 8.0 * 1500 / 1460 / 10000000000.0 + 0.00001
+                # Link bandwidth in bps. Was 10000000000.0 (10G) — wrong for this
+                # 25G testbed, which made real transfers look "faster than ideal"
+                # (slowdown < 1, physically impossible). Set to the actual 25G line
+                # rate; keep in sync with config.py's params.bandwidth. (spec §3)
+                orct = size * 8.0 * 1500 / 1460 / 25000000000.0 + 0.00001
                 start_time = float(params[11])
                 finish_time = float(params[12])
                 # if size > 2000000:
@@ -255,6 +258,89 @@ def write_cdf_slowdown(pim_output, cdf_pim_mean_file, cdf_pim_99_file):
     #     merge_file.write("{}, {}, {} \n".format(pim_sim_slowdown_sorted[j], p_i, pim_sim_p[j]))
     #     j += 50
 
+def read_metrics(filename):
+    """Parse the === DCPIM_METRICS === block emitted by the dcPIM binary."""
+    m = {"cores": []}
+    in_block = False
+    try:
+        with open(filename) as f:
+            for line in f:
+                line = line.strip()
+                if line == "=== DCPIM_METRICS ===":
+                    in_block = True
+                    continue
+                if line == "=== END_DCPIM_METRICS ===":
+                    break
+                if not in_block:
+                    continue
+                parts = line.split()
+                if not parts:
+                    continue
+                if parts[0] == "core":
+                    # core <id> role <r> productive_frac <f> polls <p> ... pkts_per_poll <v>
+                    d = {"core": parts[1]}
+                    kv = parts[2:]
+                    for k in range(0, len(kv) - 1, 2):
+                        d[kv[k]] = kv[k + 1]
+                    m["cores"].append(d)
+                elif len(parts) >= 2:
+                    m[parts[0]] = parts[1]
+    except IOError:
+        return None
+    return m if "productive_core_count" in m else None
+
+
+def latency_percentiles(filename):
+    """p99/p99.9 of FCT and slowdown from the per-flow records (co-measured, spec §1).
+    fct is in the same time unit as the ideal-FCT (seconds), so *1e6 -> microseconds."""
+    out = read_pim_file(filename)
+    if not out:
+        return None
+    fcts = [row[2] for row in out]   # fct
+    slow = [row[4] for row in out]   # fct / ideal-fct (slowdown)
+    return {
+        "n_flows": len(out),
+        "fct_p99_us": float(np.percentile(fcts, 99)) * 1e6,
+        "fct_p999_us": float(np.percentile(fcts, 99.9)) * 1e6,
+        "slowdown_p99": float(np.percentile(slow, 99)),
+        "slowdown_p999": float(np.percentile(slow, 99.9)),
+    }
+
+
+def write_cpu_metrics(rows, outpath):
+    """Per-run CPU-efficiency summary (measurement_spec Appendix logging checklist).
+    One row per node; trailing comment names the bottleneck side (max productive cores)."""
+    cols = ["node_id", "role", "window_sec", "productive_core_count",
+            "throughput_rx_gbps", "throughput_tx_gbps",
+            "throughput_per_core_rx_gbps", "throughput_per_core_tx_gbps",
+            "pps_per_core_rx", "pps_per_core_tx", "imissed",
+            "n_flows", "fct_p99_us", "fct_p999_us", "slowdown_p99"]
+    best = None
+    with open(outpath, "w") as f:
+        f.write(",".join(cols) + "\n")
+        for (nid, met, lat) in rows:
+            if met is None:
+                f.write("{},MISSING_METRICS_BLOCK\n".format(nid))
+                continue
+            row = [met.get(c, "") for c in cols[:11]]
+            if lat:
+                row += [lat["n_flows"], round(lat["fct_p99_us"], 3),
+                        round(lat["fct_p999_us"], 3), round(lat["slowdown_p99"], 3)]
+            else:
+                row += ["", "", "", ""]
+            f.write(",".join(str(x) for x in row) + "\n")
+            try:
+                pcc = float(met.get("productive_core_count", "0"))
+            except ValueError:
+                pcc = 0.0
+            if best is None or pcc > best[1]:
+                best = (met.get("role", "?"), pcc, met.get("node_id", str(nid)))
+        if best:
+            f.write("# bottleneck_side: {} (node {}), productive_core_count={:.4f}\n".format(
+                best[0], best[2], best[1]))
+    print("Wrote CPU metrics summary:", outpath)
+
+
 def main():
     if len(sys.argv) < 2:
         print ("Usage: python parse_result.py <workload> <vf_mapping.csv>")
@@ -278,6 +364,19 @@ def main():
         num_nodes = len(ids)
     stats = read_files(num_nodes, trace, mapping, ids)
     output_file(stats,  "../result/{0}_{1}_slowdown_size.dat".format(trace, num_nodes), "<FLOW_SIZE> <MEAN_SLOWDOWN> <DIFF_BETWEEN_TAIL_AND_MEAN>\n")
+
+    # --- CPU-efficiency primary metrics (measurement_spec §1) ---
+    # Resolve result_dir the same way read_files() does (handles the wc -l off-by-one).
+    result_dir = "../result/{}".format(num_nodes)
+    if mapping and (not os.path.isdir(result_dir)):
+        alt_dir = "../result/{}".format(num_nodes + 1)
+        if os.path.isdir(alt_dir):
+            result_dir = alt_dir
+    metric_rows = []
+    for i in ids:
+        pim_file = "{}/result_{}_{}.txt".format(result_dir, trace, i)
+        metric_rows.append((i, read_metrics(pim_file), latency_percentiles(pim_file)))
+    write_cpu_metrics(metric_rows, "../result/{0}_{1}_cpu_metrics.csv".format(trace, num_nodes))
     # tcp_output = read_files(tcp_date, num_nodes, trace)
     # write_cdf_slowdown(pim_output, "parse_cdf_pim_{}.dat".format(trace), "parse_cdf_pim_{}_99.dat".format(trace))
     # write_cdf_slowdown(tcp_output, "parse_cdf_tcp_{}.dat".format(trace), "parse_cdf_tcp_{}_99.dat".format(trace))

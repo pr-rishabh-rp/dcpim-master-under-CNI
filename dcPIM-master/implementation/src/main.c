@@ -102,6 +102,28 @@ struct pim_host host;
 struct pim_pacer pacer;
 
 char *cdf_file;
+
+/* ---- dcPIM CPU-efficiency instrumentation (measurement_spec §1, §6.3) ----
+ * DPDK poll-mode cores are pinned at 100% by mpstat/sar, so raw CPU% is
+ * meaningless. We instead measure the PRODUCTIVE-CYCLE FRACTION per lcore:
+ * of the cycles a core spent in the steady-state window, how many did real
+ * packet work (rx parse + timer/epoch matching + control TX) vs. spinning on
+ * empty polls. Sum of fractions = "productive-core count", the DPDK-faithful
+ * equivalent of Cai et al.'s busy-core count. */
+struct dcpim_core_stat {
+	uint64_t work_cyc;     /* cycles doing real work */
+	uint64_t polls;        /* rx/tx poll iterations in the window */
+	uint64_t empty_polls;  /* polls that found nothing to do */
+	uint64_t rx_pkts;      /* packets pulled from the NIC */
+	uint64_t tx_pkts;      /* packets handed to the NIC */
+	char role[12];         /* "rx" / "pacer" / "flowgen" */
+} __rte_cache_aligned;
+struct dcpim_core_stat dcpim_core_stat[RTE_MAX_LCORE];
+/* Steady-state window: starts when start_signal flips (warm-up excluded, §5),
+ * ends when force_quit is set. */
+volatile uint64_t dcpim_win_start_tsc = 0;
+volatile uint64_t dcpim_win_end_tsc = 0;
+struct rte_eth_stats dcpim_stats_start;   /* NIC counters at window start */
 static volatile bool force_quit;
 
 bool start_signal;
@@ -150,6 +172,7 @@ static void host_main_loop(void) {
 
 	// rte_timer_reset(&epoch.epoch_timer, rte_get_timer_hz() * (params.pim_epoch - params.pim_iter_epoch * params.pim_iter_limit),
 	//  PERIODICAL, 1, &pim_start_new_epoch, (void *)(&epoch.pim_timer_params));
+	strncpy(dcpim_core_stat[lcore_id].role, "rx", sizeof(dcpim_core_stat[lcore_id].role) - 1);
 	while(!force_quit) {
 		for (i = 0; i < qconf->n_rx_port; i++) {
 			// OLD: skipped index 0. On the CloudLab setup the data port was port 1
@@ -163,16 +186,27 @@ static void host_main_loop(void) {
 
 			nb_rx = rte_eth_rx_burst(portid, 0,
 						 pkts_burst, MAX_PKT_BURST);
+			if (dcpim_win_start_tsc) {
+				dcpim_core_stat[lcore_id].polls++;
+				if (nb_rx == 0) dcpim_core_stat[lcore_id].empty_polls++;
+				else dcpim_core_stat[lcore_id].rx_pkts += nb_rx;
+			}
+			uint64_t rx_w0 = rte_rdtsc();
 			for (j = 0; j < nb_rx; j++) {
 				p = pkts_burst[j];
 				// rte_vlan_strip(p);
 				pim_rx_packets(&epoch, &host, &pacer, p);
 			}
+			if (dcpim_win_start_tsc && nb_rx > 0)
+				dcpim_core_stat[lcore_id].work_cyc += (rte_rdtsc() - rx_w0);
 		}
 		cur_tsc = rte_rdtsc();
         diff_tsc = cur_tsc - prev_tsc;
          if (diff_tsc > cycle_per_us / 10) {
+                uint64_t tm_w0 = rte_rdtsc();
                 rte_timer_manage();
+                if (dcpim_win_start_tsc)
+                        dcpim_core_stat[lcore_id].work_cyc += (rte_rdtsc() - tm_w0);
                  prev_tsc = cur_tsc;
          }
 	}
@@ -187,7 +221,11 @@ static void pacer_main_loop(void) {
 
 	// uint64_t cycles[16];
 	// bool rts_sent = false;
+	unsigned pacer_lcore = rte_lcore_id();
+	strncpy(dcpim_core_stat[pacer_lcore].role, "pacer", sizeof(dcpim_core_stat[pacer_lcore].role) - 1);
 	while(!force_quit){
+		uint64_t pc_it_start = rte_rdtsc();
+		int pc_did_tx = 0;
 		update_time_byte(&pacer);
 		while(!rte_ring_empty(pacer.ctrl_q)) {
 
@@ -233,10 +271,20 @@ static void pacer_main_loop(void) {
 		   	}
 			// cycles[1] = rte_get_timer_cycles();
 			// rts_sent = true;
+			pc_did_tx = 1;
+			if (dcpim_win_start_tsc) dcpim_core_stat[pacer_lcore].tx_pkts++;
 
 		}
 		// cycles[2] = rte_get_timer_cycles();
+		uint64_t pc_after_ctrl = rte_rdtsc();
+		if (dcpim_win_start_tsc) {
+			dcpim_core_stat[pacer_lcore].polls++;
+			if (pc_did_tx) dcpim_core_stat[pacer_lcore].work_cyc += (pc_after_ctrl - pc_it_start);
+			else dcpim_core_stat[pacer_lcore].empty_polls++;
+		}
+		uint64_t pc_tm0 = rte_rdtsc();
 		rte_timer_manage();
+		if (dcpim_win_start_tsc) dcpim_core_stat[pacer_lcore].work_cyc += (rte_rdtsc() - pc_tm0);
 		// cycles[3] = rte_get_timer_cycles();
 		// if(rts_sent) {
 		// 	uint32_t i = 0;
@@ -330,7 +378,10 @@ static void flow_generate_loop(void) {
     while(!start_signal && !force_quit) {
 	    rte_delay_us_block(10000);
     }
+	unsigned fg_lcore = rte_lcore_id();
+	strncpy(dcpim_core_stat[fg_lcore].role, "flowgen", sizeof(dcpim_core_stat[fg_lcore].role) - 1);
 	while(!force_quit) {
+		if (dcpim_win_start_tsc) dcpim_core_stat[fg_lcore].polls++;
 		cur_tsc = rte_rdtsc();
         diff_tsc = cur_tsc - prev_tsc;
          if (diff_tsc > TIMER_RESOLUTION_CYCLES * time * 1000000.0 && i < TARGET_NUM) {
@@ -354,7 +405,9 @@ static void flow_generate_loop(void) {
 			 	break;
 			}
 
+			uint64_t fg_g0 = rte_rdtsc();
 			pim_new_flow_comes(&host, & pacer, i + params.index * 100000, dst_ip, &dst_ether, flow_size);
+			if (dcpim_win_start_tsc) dcpim_core_stat[fg_lcore].work_cyc += (rte_rdtsc() - fg_g0);
             // printf("flow id%u\n", i);
             // printf("flow size:%u\n", flow_size);
             // printf("time:%f\n", time);
@@ -480,6 +533,7 @@ signal_handler(int signum)
 		printf("\n\nSignal %d received, preparing to exit...\n",
 				signum);
 		force_quit = true;
+		dcpim_win_end_tsc = rte_rdtsc();
 		if(mode == 1 || mode == 2) {
 			uint32_t* flow_id = 0;
 			int32_t position = 0;
@@ -768,6 +822,17 @@ main(int argc, char **argv)
     	start_main_loop();
 	} */
 
+	/* Steady-state window (measurement_spec §5): exclude warm-up. Wait for
+	 * start_signal (set when PIM_START is processed / the matching phase begins),
+	 * then snapshot TSC + NIC counters as the window start. */
+	while(!force_quit && !start_signal){
+		rte_delay_us_sleep(1000);
+	}
+	if(!force_quit){
+		rte_eth_stats_get(0, &dcpim_stats_start);
+		dcpim_win_start_tsc = rte_rdtsc();
+		printf("Steady-state window started (warm-up excluded).\n");
+	}
 	while(!force_quit){
 		// print_stats();
 //		printf("in force quiit\n");
@@ -803,6 +868,72 @@ main(int argc, char **argv)
 			       portid, st.ipackets, st.opackets, st.ierrors,
 			       st.oerrors, st.imissed, st.rx_nombuf);
 		}
+	}
+
+	/* ---- dcPIM CPU-efficiency METRICS block (parsed by parse_result.py) ----
+	 * Productive-core accounting per measurement_spec §1 / §6.3. Emitted on both
+	 * sender (mode 1) and receiver/start (mode 2) so the bottleneck side can be
+	 * determined from the data (§2). */
+	{
+		struct rte_eth_stats se;
+		uint64_t hz = rte_get_timer_hz();
+		uint64_t win_end = dcpim_win_end_tsc ? dcpim_win_end_tsc : rte_rdtsc();
+		double window_sec = 0.0, win_cyc = 0.0;
+		unsigned c;
+		double prod_cores = 0.0;
+		if (dcpim_win_start_tsc && win_end > dcpim_win_start_tsc) {
+			win_cyc = (double)(win_end - dcpim_win_start_tsc);
+			window_sec = win_cyc / (double)hz;
+		}
+		rte_eth_stats_get(0, &se);
+		uint64_t d_ib = se.ibytes   - dcpim_stats_start.ibytes;
+		uint64_t d_ob = se.obytes   - dcpim_stats_start.obytes;
+		uint64_t d_ip = se.ipackets - dcpim_stats_start.ipackets;
+		uint64_t d_op = se.opackets - dcpim_stats_start.opackets;
+		uint64_t d_im = se.imissed  - dcpim_stats_start.imissed;
+
+		printf("=== DCPIM_METRICS ===\n");
+		printf("node_id %u\n", params.index);
+		printf("role %s\n", (mode == 2) ? "start" : "send");
+		printf("window_sec %.6f\n", window_sec);
+		printf("rx_bytes %"PRIu64"\n", d_ib);
+		printf("tx_bytes %"PRIu64"\n", d_ob);
+		printf("rx_packets %"PRIu64"\n", d_ip);
+		printf("tx_packets %"PRIu64"\n", d_op);
+		printf("imissed %"PRIu64"\n", d_im);
+		for (c = 0; c < RTE_MAX_LCORE; c++) {
+			if (dcpim_core_stat[c].role[0] == '\0')
+				continue;
+			double frac = (win_cyc > 0.0)
+				? (double)dcpim_core_stat[c].work_cyc / win_cyc : 0.0;
+			double ppp = (dcpim_core_stat[c].polls > 0)
+				? (double)dcpim_core_stat[c].rx_pkts / (double)dcpim_core_stat[c].polls : 0.0;
+			prod_cores += frac;
+			printf("core %u role %s productive_frac %.6f polls %"PRIu64
+			       " empty_polls %"PRIu64" rx_pkts %"PRIu64" tx_pkts %"PRIu64
+			       " pkts_per_poll %.4f\n",
+			       c, dcpim_core_stat[c].role, frac,
+			       dcpim_core_stat[c].polls, dcpim_core_stat[c].empty_polls,
+			       dcpim_core_stat[c].rx_pkts, dcpim_core_stat[c].tx_pkts, ppp);
+		}
+		printf("productive_core_count %.6f\n", prod_cores);
+		if (window_sec > 0.0) {
+			double rx_gbps = (double)d_ib * 8.0 / window_sec / 1e9;
+			double tx_gbps = (double)d_ob * 8.0 / window_sec / 1e9;
+			double rx_pps  = (double)d_ip / window_sec;
+			double tx_pps  = (double)d_op / window_sec;
+			printf("throughput_rx_gbps %.6f\n", rx_gbps);
+			printf("throughput_tx_gbps %.6f\n", tx_gbps);
+			printf("pps_rx %.1f\n", rx_pps);
+			printf("pps_tx %.1f\n", tx_pps);
+			if (prod_cores > 0.0) {
+				printf("throughput_per_core_rx_gbps %.6f\n", rx_gbps / prod_cores);
+				printf("throughput_per_core_tx_gbps %.6f\n", tx_gbps / prod_cores);
+				printf("pps_per_core_rx %.1f\n", rx_pps / prod_cores);
+				printf("pps_per_core_tx %.1f\n", tx_pps / prod_cores);
+			}
+		}
+		printf("=== END_DCPIM_METRICS ===\n");
 	}
 
 	RTE_ETH_FOREACH_DEV(portid) {
